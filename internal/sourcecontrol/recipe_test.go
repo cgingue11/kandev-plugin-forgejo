@@ -458,6 +458,55 @@ func TestInspectURLUsesVerifiedWorkspaceAndBindsProviderIdentity(t *testing.T) {
 	require.Equal(t, inspected.RepositoryID, body.Repository.RepositoryID)
 }
 
+// hostRepositoryInspection mirrors the JSON tags of the host's
+// plugins.RepositoryProviderInspection (kandev
+// apps/backend/internal/plugins/repository_provider_inspect.go), which Go's
+// internal-package rule keeps us from importing. See also the repositories.inspect
+// section of kandev docs/public/plugins-authoring.md.
+type hostRepositoryInspection struct {
+	ProviderID           string `json:"provider_id"`
+	ProviderHost         string `json:"provider_host"`
+	ProviderScope        string `json:"provider_scope"`
+	ProviderRepositoryID string `json:"provider_repository_id"`
+	OwnerOrProject       string `json:"owner_or_project"`
+	Name                 string `json:"name"`
+	CloneURL             string `json:"clone_url"`
+	DefaultBranch        string `json:"default_branch"`
+}
+
+// The host decodes the inspect response with provider_repository_id as the
+// immutable identifier; a response without it is rejected as invalid.
+func TestInspectResponseMatchesHostInspectionContract(t *testing.T) {
+	details := &repositoryDetailsStub{inspected: &Repository{
+		ProviderHost:    "code.example",
+		ConnectionScope: "https://code.example",
+		RepositoryID:    "5",
+		OwnerOrProject:  "tools",
+		Name:            "widgets",
+		CloneURL:        "https://code.example/tools/widgets.git",
+		DefaultBranch:   "main",
+	}}
+	extension := &Extension{ProviderID: "acme", RepositoryDetails: details}
+
+	response, err := extension.HandleAction(context.Background(), &pluginsdk.PluginActionRequest{
+		ActionKey: ActionRepositoriesInspect,
+		Context:   pluginsdk.VerifiedActionContext{WorkspaceID: "workspace-1"},
+		Body:      []byte(`{"url":"https://code.example/tools/widgets"}`),
+	})
+	require.NoError(t, err)
+
+	var body struct {
+		Repository *hostRepositoryInspection `json:"repository"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body, &body))
+	require.NotNil(t, body.Repository)
+	require.Equal(t, "acme", body.Repository.ProviderID)
+	require.Equal(t, "5", body.Repository.ProviderRepositoryID)
+	require.Equal(t, "tools", body.Repository.OwnerOrProject)
+	require.Equal(t, "widgets", body.Repository.Name)
+	require.Equal(t, "main", body.Repository.DefaultBranch)
+}
+
 func TestBranchesResolveStoredImmutableIdentityBeforeProviderIO(t *testing.T) {
 	resolved := Repository{
 		ProviderID:      "acme",

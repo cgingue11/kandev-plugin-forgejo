@@ -308,7 +308,12 @@ func (e *Extension) inspectRepository(ctx context.Context, request *pluginsdk.Pl
 	}
 	bound := *repository
 	bound.ProviderID = e.ProviderID
-	return jsonResponse(map[string]any{"repository": bound})
+	// The host's inspection contract names the immutable identifier
+	// provider_repository_id; repository_id stays for the plugin UI.
+	return jsonResponse(map[string]any{"repository": struct {
+		Repository
+		ProviderRepositoryID string `json:"provider_repository_id"`
+	}{bound, bound.RepositoryID}})
 }
 
 func (e *Extension) unlinkChangeRequest(ctx context.Context, request *pluginsdk.PluginActionRequest) (*pluginsdk.PluginActionResponse, error) {
