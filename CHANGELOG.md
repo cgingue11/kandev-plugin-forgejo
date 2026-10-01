@@ -12,6 +12,12 @@
   never while the workspace integration is switched off. The binding is a
   digest over the instance URL, token and lease scope, so a rotated token
   revokes the leases issued under the old one without a network call.
+- `repositories.inspect` now emits `provider_repository_id`, the field Kandev's
+  inspection contract reads for the immutable repository identifier. The
+  response only carried `repository_id`, so the host parsed an empty ID and
+  rejected every picker selection with "The selected repository could not be
+  verified"; task creation from a Forgejo or Gitea repository failed on Kandev
+  0.95.1. `repository_id` stays, because the plugin UI reads it.
 
 ## 0.2.0
 
